@@ -6,7 +6,9 @@
 **Release:** v0.x beta, ship desktop and mobile together  
 **Decision authority:** Prior product interview, including rounds 18–18E and the final Human-readable URLs discussion
 
-> **Decision semantics.** **Confirmed** = explicitly selected/accepted in product discussion. **Provisional** = safe engineering choice where no final selection was made; verify before treating as a permanent product contract. **Must test** = behavior that cannot be guaranteed from documentation alone. More recent decisions override earlier ones.
+> **Decision semantics.** **Confirmed** = explicitly selected/accepted in product discussion. **Provisional** = a safe engineering choice that was not individually settled in the original discussion; these choices were subsequently accepted for the beta and may be revisited using production feedback. **Must test** = behavior that cannot be guaranteed from documentation alone. More recent decisions override earlier ones.
+
+For the historical decision context and recorded trade-offs, see [Decision Rationale & Trade-off Record](./decision-rationale.md). This specification remains authoritative for expected behavior and later decisions.
 
 ## 1. Motivation and product boundary
 
@@ -191,7 +193,7 @@ Optional `Enable Text Fragment` setting for **External mode with selection only*
 - If the feature is disabled, do not generate a new `:~:text=` directive.
 - When disabled, do not add or modify an existing Text Fragment merely because it is present in `source_url`. Preserve the original fragment when no selection exists or no new heading fragment is available; a successfully generated heading fragment replaces the entire original fragment, including any existing directive.
 
-**Provisional implementation details (Round 18D questions were not answered):**
+**Provisional implementation details (Round 18D questions were not individually answered; the defaults below were subsequently accepted for the beta):**
 
 - Whitespace: normalize sequences of visible whitespace to single spaces for fragment extraction; preserve punctuation/letter order. Do not alter displayed quote Markdown.
 - Source blocks: attempt when enough visible text exists, including code/tables where possible, but skip image-only/alt-only or unreliable source mappings rather than guessing.
@@ -316,7 +318,7 @@ Suggested pure modules: `snapshot`, `markdown-structure`, `heading-resolver`, `l
 3. Desktop dual-format clipboard write semantics and semantic HTML paste in recipients.
 4. Safe human-readable URL serialization round-trip across unusual encodings and signed/legacy source URLs.
 5. Text Fragment snippet segmentation / Unicode boundary behavior and pre-existing fragment directives; benchmark clipped webpage mismatch.
-6. **Unanswered Round 18D preferences**: whitespace normalization, handling of code/tables/image-only selections, and whether one-time/no warning about Text Fragment reliability is desired. The provisional defaults in §5.2 are implementation guidance, **not** explicit user choices.
+6. **Round 18D defaults**: whitespace normalization, handling of code/tables/image-only selections, and Text Fragment reliability feedback were not individually decided in that round. The provisional defaults in §5.2 were subsequently accepted for the beta and can be revisited based on production feedback.
 
 **Release posture:** `v0.x` beta; shared release for Desktop+Mobile. Do not quietly drop mobile or claim guaranteed anchors/text highlighting. Fix acceptance-blocking incompatibilities first. No implementation began as part of preparing this document.
 
