@@ -1,5 +1,40 @@
 # Issue #2 validation
 
+## Guided desktop acceptance (2026-11-03, completed)
+
+User-reported manual results for the current literal-title implementation. Installed Joplin version **3.7.21** was read from the local app metadata; **macOS 26.5.2** was read with `sw_vers`. The developer confirmed each test's observed result in the guided session. These are desktop observations, not mobile compatibility evidence.
+
+| Test | Result |
+| --- | --- |
+| In Markdown, select only the first paragraph of a two-paragraph note titled ``[草稿] TypeScript (筆記) `Array<T> \| undefined` ``; invoke Internal from the palette and paste into another Markdown note | **Passed (developer confirmed):** selected paragraph becomes a blockquote with blank quoted separator and linked attribution; preview preserves literal title brackets/parentheses and inline code; the source link returns to the original note |
+| Collapse the selection and copy a note-level link | **Passed (developer confirmed):** output is only the source-note link, without quotation text, blockquote markers or attribution prefix; the link returns to the source note |
+| Command availability in Rich Text | **Passed (developer confirmed):** Internal is unavailable in both the Command Palette and editor context menu (hidden or disabled; exact presentation was not distinguished) |
+| Command availability in viewer-only layout and after returning to Markdown | **Passed (developer confirmed):** Internal is unavailable in the viewer-only Command Palette; restoring the Markdown editor makes it available in the palette and editor context menu; invoking it from the context menu still copies successfully |
+
+All checks in this guided desktop acceptance session passed. No production code changed during the session, so the previously completed automated checks were not rerun for these documentation-only updates. Actual assigned-shortcut invocation, other operating systems and mobile remain untested. Changes remain unstaged and uncommitted.
+
+## Title fixture refinement (2026-11-03)
+
+Removed five unrealistic note-title link/image fixtures left over from the earlier Markdown-parsing approach. An ordinary `[草稿] TypeScript (筆記)` title now covers literal brackets and parentheses; the main inline-code example uses `Array<T> | undefined`. This is test-fixture refinement, not a production behavior change or a new TDD cycle.
+
+`npm test` passed format, lint, typechecking, **39 source tests**, production build and **5 bundle tests**. `git diff --check` passed. No runtime checks, staging or commits were performed.
+
+## Literal note title policy correction (2026-11-03)
+
+The developer clarified that note titles are literal text, except for inline code using one backtick on each side. This supersedes the earlier shared heading/title policy, title-link flattening, adjacent-code-span repairs, unknown-token handling and the proposed formatting-boundary spacing fix. Heading Markdown remains a separate future concern. Spec §3.4 and its acceptance matrix now distinguish titles from headings.
+
+Removed the title Markdown AST renderer, delimiter repair code, and obsolete tests that expected title emphasis/link/image parsing. Title rendering now escapes literal punctuation and recognizes only non-empty single-backtick spans, preserving their contents and delimiters. Double/triple, mismatched and unmatched backticks stay literal. Title links/images retain all visible syntax, entity-looking text is not decoded, and line breaks become spaces. Removed the now-unused `markdown-it` dependency with `npm uninstall markdown-it --ignore-scripts --offline --no-audit --no-fund`.
+
+TDD evidence at the established source/options-to-Markdown boundary:
+
+1. Added a title example containing strong and link syntax with literal expected output. `npm run test:unit` failed because the old implementation formatted strong and removed the link destination. Replacing parsing with literal escaping made all 24 then-current source tests pass; `npm run typecheck` passed.
+2. Added a single-backtick example containing `#`, `|` and asterisks. `npm run test:unit` failed because the literal-only implementation escaped its delimiters and contents. Recognizing single-backtick spans made all 25 then-current tests and typechecking pass.
+3. Added retrospective cases for empty/blank titles, whitespace, literal emphasis/strikethrough/link/image/HTML/entity text, code spans inside literal link syntax, multiple code spans and unsupported backtick forms. Updated both bundle expectations to keep the source title's literal asterisks. Capture, selection-body and command-failure tests remain in place.
+
+Final `npm test` passed formatting, lint, typechecking, **43 source tests**, production build and **5 bundle tests**. `git diff --check` passed. The old punctuation-adjacent emphasis failure is superseded by the corrected title requirement: its syntax is now expected to remain literal, and the replacement example passes. It is not being reported as a successful fix for Markdown heading formatting.
+
+No new real Joplin desktop/mobile runtime checks were performed. Desktop command-availability acceptance and mobile release gates remain as recorded below. Changes remain unstaged/uncommitted; the milestone commit was not amended.
+
 ## Hunk correction: preserve independent code spans (2026-11-03)
 
 The developer rejected merging adjacent inline code contents: the original spans must remain independent, with a separating space if needed after link flattening. This supersedes the merging implementation and expectations recorded below. Updated spec §3.4 to record the accepted rule.

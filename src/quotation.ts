@@ -1,108 +1,32 @@
 import { QuoteConfig } from './config';
-import MarkdownIt = require('markdown-it');
-
-const markdown = new MarkdownIt({ html: false });
 
 function escapeText(text: string): string {
-  // Keep label punctuation literal, including & so decoded entities cannot be parsed again.
-  const escaped = text.replace(/[\\`*_[\]{}()<>!|#~&]/g, '\\$&');
-  // A link label stays on one line even when the source title contains line breaks.
-  return escaped.replace(/[\r\n]+/g, ' ');
+  // Keep title punctuation literal, including & so entity-looking text stays literal.
+  return text.replace(/[\\`*_[\]{}()<>!|#~&]/g, '\\$&');
 }
 
 function renderLabel(title: string): string {
   const displayTitle = title.trim() || 'Untitled';
-  const inline = markdown.parseInline(displayTitle, {})[0];
-  const tokens = inline.children;
-  function flattenTokens(items: any[]): any[] {
-    const flattened: any[] = [];
-    for (const token of items) {
-      if (token.type === 'link_open' || token.type === 'link_close') {
-        continue;
-      }
-      if (token.type === 'text' && token.content === '') {
-        continue;
-      }
-      if (token.type === 'image') {
-        flattened.push(...flattenTokens(token.children));
-      } else {
-        flattened.push(token);
-      }
-    }
-
-    return flattened;
+  // A link label stays on one line even when the source title contains line breaks.
+  const singleLineTitle = displayTitle.replace(/[\r\n]+/g, ' ');
+  // Match whole backtick runs so double/triple delimiters stay literal.
+  // Only pairs of single backticks with non-empty contents are title inline code.
+  const codeSpans = /(`+)([^`]+)(`+)/g;
+  const parts: string[] = [];
+  let textStart = 0;
+  let match: RegExpExecArray;
+  while ((match = codeSpans.exec(singleLineTitle)) !== null) {
+    parts.push(escapeText(singleLineTitle.slice(textStart, match.index)));
+    const [span, opening, , closing] = match;
+    const singleBackticks = opening.length === 1 && closing.length === 1;
+    parts.push(singleBackticks ? span : escapeText(span));
+    textStart = match.index + span.length;
   }
 
-  function render(items: any[]): string {
-    const flattened = flattenTokens(items);
-    const merged: any[] = [];
-    for (const token of flattened) {
-      const previous = merged[merged.length - 1];
-      // Removing wrappers can join identically formatted spans. Keep them as
-      // one span so adjacent closing/opening delimiters cannot become literal.
-      const joinsEmphasis = previous?.type === 'em_close' && token.type === 'em_open';
-      const joinsStrong = previous?.type === 'strong_close' && token.type === 'strong_open';
-      if (joinsEmphasis || joinsStrong) {
-        merged.pop();
-      } else {
-        merged.push(token);
-      }
-    }
+  parts.push(escapeText(singleLineTitle.slice(textStart)));
+  const label = parts.join('');
 
-    const renderedTokens = merged.map((token, index) => {
-      const previous = merged[index - 1];
-      const adjacentCode = previous?.type === 'code_inline' && token.type === 'code_inline';
-      const renderedToken = renderToken(token);
-      // Keep independent code spans separate after removing link/image wrappers.
-      // A space prevents their closing/opening backtick runs from colliding.
-      return adjacentCode ? ` ${renderedToken}` : renderedToken;
-    });
-
-    return renderedTokens.join('');
-  }
-
-  function renderToken(token: any): string {
-    switch (token.type) {
-      case 'text':
-        return escapeText(token.content);
-      case 'code_inline': {
-        // The parser gives us code contents without the original delimiters.
-        // Find consecutive backticks so the new delimiters cannot close early.
-        const backtickRuns = token.content.match(/`+/g) || [];
-        const runLengths = backtickRuns.map((run) => run.length);
-        const longestRun = Math.max(0, ...runLengths);
-        // For content a`b, use two backticks on each side: ``a`b``.
-        const fence = '`'.repeat(longestRun + 1);
-        const content = token.content;
-        const touchesBacktick = content.startsWith('`') || content.endsWith('`');
-        // Protect real edge spaces from code-span whitespace normalization.
-        const hasNonSpaceContent = content.trim().length > 0;
-        const hasEdgeSpaces = content.startsWith(' ') && content.endsWith(' ');
-        const needsSpacePadding = hasEdgeSpaces && hasNonSpaceContent;
-        const padding = touchesBacktick || needsSpacePadding ? ' ' : '';
-
-        return `${fence}${padding}${content}${padding}${fence}`;
-      }
-      // Flattening links can place emphasis inside a word. Asterisks retain
-      // formatting there, whereas underscore delimiters become literal text.
-      case 'em_open':
-      case 'em_close':
-        return '*';
-      case 'strong_open':
-      case 'strong_close':
-        return '**';
-      case 's_open':
-      case 's_close':
-        return token.markup;
-      case 'softbreak':
-      case 'hardbreak':
-        return ' ';
-      default:
-        throw new Error(`Unsupported attribution token: ${token.type}`);
-    }
-  }
-
-  return render(tokens);
+  return label;
 }
 
 export interface QuotationSource {

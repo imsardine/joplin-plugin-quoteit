@@ -135,7 +135,7 @@ test('delivery bundles connect the registered command, CM6 capture and clipboard
   const expected = [
     '> Selected **passage**',
     '>',
-    '> -- [Source **note**](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
+    '> -- [Source \\*\\*note\\*\\*](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
   ].join('\n');
 
   assert.deepEqual(plugin.copied, [expected]);
@@ -161,7 +161,9 @@ test('delivery bundles copy a link for whitespace-only selection', async () => {
   const whitespaceOnly = [' ', '\t'].join('\n');
   const plugin = await loadPlugin(whitespaceOnly);
   await plugin.copy();
-  assert.deepEqual(plugin.copied, ['[Source **note**](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)']);
+  assert.deepEqual(plugin.copied, [
+    '[Source \\*\\*note\\*\\*](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
+  ]);
 });
 
 test('delivery bundle reports clipboard failure with an error toast and no modal', async () => {

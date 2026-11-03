@@ -2,7 +2,6 @@ import { describe, test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { renderQuotation, QuotationSource } from '../src/quotation';
 import type { QuoteConfig } from '../src/config';
-import MarkdownIt = require('markdown-it');
 
 const options: Readonly<QuoteConfig> = { attributionPrefix: '-- ' };
 
@@ -166,159 +165,75 @@ describe('Selected quotation body', () => {
   });
 });
 
-describe('Attribution labels (spec §3.4)', () => {
-  for (const { title, label } of [
-    { title: '_a_*b*', label: '*ab*' },
-    { title: '__a__**b**', label: '**ab**' },
-    { title: '_a_[_b_](https://example.com)', label: '*ab*' },
-  ]) {
-    test(`preserves adjacent formatting in title ${title}`, () => {
-      const source = { ...sourceDefaults, title };
-      const output = renderQuotation(source, options);
-
-      assert.equal(output, `[${label}](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)`);
-    });
-  }
-
-  test('retains emphasis next to a flattened link', () => {
-    const source = { ...sourceDefaults, title: '[a](https://example.com)_b_' };
+describe('Note title labels (spec §3.4)', () => {
+  test('preserves single-backtick inline code without escaping its contents', () => {
+    const source = { ...sourceDefaults, title: 'Understanding `Array<T> | undefined`' };
     const output = renderQuotation(source, options);
 
-    assert.equal(output, '[a*b*](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
+    assert.equal(
+      output,
+      '[Understanding `Array<T> | undefined`](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
+    );
   });
 
-  test('retains punctuation-leading emphasis next to a flattened link', () => {
-    const source = { ...sourceDefaults, title: '[a](https://example.com)*!b*' };
-    const output = renderQuotation(source, options);
-
-    // Spec §3.4 requires retained formatting, not merely retained delimiter text.
-    // Parse the output here because flattening changes Markdown delimiter boundaries.
-    const markdown = new MarkdownIt({ html: false });
-    const rendered = markdown.renderInline(output);
-
-    assert.equal(rendered, '<a href=":/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">a<em>!b</em></a>');
-  });
-
-  test('preserves literal entity text in the attribution label', () => {
-    const source = { ...sourceDefaults, title: '&amp;copy;' };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[\\&copy;](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  test('blank note title is displayed as Untitled', () => {
-    const source = { ...sourceDefaults, title: ' ' };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[Untitled](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  test('retains formatting but flattens links in labels', () => {
-    const source = { ...sourceDefaults, title: '**Bold** [ref](https://example.com) | #tag' };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[**Bold** ref \\| \\#tag](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  test('image labels become readable alt text while retaining inline formatting', () => {
-    const source = {
-      ...sourceDefaults,
-      title: 'See ![**diagram**](https://example.com/image.png)',
-    };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[See **diagram**](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  test('preserves adjacent inline code when a title link is flattened', () => {
-    const source = { ...sourceDefaults, title: '`a`[`b`](https://example.com)' };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[`a` `b`](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  test('keeps backtick-containing inline code separate after link flattening', () => {
-    const source = { ...sourceDefaults, title: '``a`b``[`c`](https://example.com)' };
-    const output = renderQuotation(source, options);
-
-    assert.equal(output, '[``a`b`` `c`](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)');
-  });
-
-  for (const { title, expected } of [
-    {
-      title: '`` `edge` ``',
-      expected: '[`` `edge` ``](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      title: '`  padded  `',
-      expected: '[`  padded  `](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      // MarkdownIt 14 normalizes this all-space code content to one space.
-      title: '`   `',
-      expected: '[` `](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      title: '`plain`',
-      expected: '[`plain`](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      title: '``a`b``',
-      expected: '[``a`b``](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      title: '```a``b```',
-      expected: '[```a``b```](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-    {
-      title: '`#tag | value`',
-      expected: '[`#tag | value`](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)',
-    },
-  ]) {
-    test(`preserves inline code in title ${title}`, () => {
-      const source = { ...sourceDefaults, title };
-      const output = renderQuotation(source, options);
-      assert.equal(output, expected);
-    });
-  }
-
-  // Spec §3.4 applies the same inline Markdown policy to note titles and headings.
   for (const { behavior, title, label } of [
-    { behavior: 'preserves asterisk emphasis', title: '*italic*', label: '*italic*' },
-    { behavior: 'preserves underscore emphasis', title: '_italic_', label: '*italic*' },
-    { behavior: 'preserves underscore strong emphasis', title: '__bold__', label: '**bold**' },
-    { behavior: 'preserves strikethrough', title: '~~removed~~', label: '~~removed~~' },
-    { behavior: 'flattens existing links', title: '[name](https://example.com)', label: 'name' },
+    { behavior: 'uses Untitled for an empty title', title: '', label: 'Untitled' },
+    { behavior: 'uses Untitled for a blank title', title: ' \t', label: 'Untitled' },
+    { behavior: 'trims outer title whitespace', title: '  Note  ', label: 'Note' },
     {
-      behavior: 'uses image alt text',
-      title: '![alt](https://example.com/image.png)',
-      label: 'alt',
+      behavior: 'keeps emphasis and strikethrough markers literal',
+      title: '*italic* _word_ ~~removed~~',
+      label: '\\*italic\\* \\_word\\_ \\~\\~removed\\~\\~',
     },
     {
-      behavior: 'omits images with empty alt text',
-      title: '![](https://example.com/image.png)',
-      label: '',
+      behavior: 'preserves brackets and parentheses in an ordinary title',
+      title: '[草稿] TypeScript (筆記)',
+      label: '\\[草稿\\] TypeScript \\(筆記\\)',
     },
     {
-      behavior: 'replaces soft line breaks with spaces',
-      title: ['first', 'last'].join('\n'),
-      label: 'first last',
+      behavior: 'keeps HTML literal',
+      title: '<b>text</b>',
+      label: '\\<b\\>text\\</b\\>',
+    },
+    { behavior: 'does not decode entity text', title: '&amp;copy;', label: '\\&amp;copy;' },
+    {
+      behavior: 'escapes the separator and tag punctuation',
+      title: '#tag | value',
+      label: '\\#tag \\| value',
     },
     {
-      behavior: 'replaces hard line breaks with spaces',
+      behavior: 'replaces line breaks without interpreting hard-break syntax',
       title: ['first  ', 'last'].join('\n'),
-      label: 'first last',
+      label: 'first   last',
     },
-    { behavior: 'escapes literal HTML', title: '<b>text</b>', label: '\\<b\\>text\\</b\\>' },
-    { behavior: 'trims title whitespace', title: '  trimmed  ', label: 'trimmed' },
-    { behavior: 'uses Untitled for empty titles', title: '', label: 'Untitled' },
     {
-      behavior: 'escapes literal Markdown punctuation',
-      title: '[literal] #tag | value',
-      label: '\\[literal\\] \\#tag \\| value',
+      behavior: 'keeps multiple single-backtick spans',
+      title: '`a` and `b`',
+      label: '`a` and `b`',
+    },
+    {
+      behavior: 'keeps double-backtick syntax literal',
+      title: '``code``',
+      label: '\\`\\`code\\`\\`',
+    },
+    {
+      behavior: 'keeps triple-backtick syntax literal',
+      title: '```code```',
+      label: '\\`\\`\\`code\\`\\`\\`',
+    },
+    {
+      behavior: 'keeps mismatched backtick runs literal',
+      title: '`code``',
+      label: '\\`code\\`\\`',
+    },
+    { behavior: 'keeps an unmatched backtick literal', title: '`code', label: '\\`code' },
+    {
+      behavior: 'preserves spaces inside single-backtick code',
+      title: '`  padded  `',
+      label: '`  padded  `',
     },
   ]) {
-    test(`title label ${behavior} (spec §3.4)`, () => {
+    test(`note title ${behavior}`, () => {
       const source = { ...sourceDefaults, title };
       const output = renderQuotation(source, options);
 
