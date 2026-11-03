@@ -41,7 +41,9 @@ Quote It focuses on making quotations easy to copy, reuse, and share, with their
 
 ### 2.2 Selection snapshot — Confirmed
 
-Take an atomic/coherent **Selection Snapshot** containing: active note ID and title; note source URL metadata; note body/source text required for heading analysis; selection start/end offsets and selected raw Markdown; relevant editor/note identity; and settings needed for output. **On mobile capture this before opening the mode selector.**
+Take a **Selection Snapshot** containing: active note ID and title; note source URL metadata; note body/source text required for heading analysis; selection start/end offsets and selected raw Markdown; relevant editor/note identity; and settings needed for output. **On mobile capture this before opening the mode selector.**
+
+Review decision (2026-11-02): read the editor state once, then fetch metadata once for that captured note ID and verify the returned note ID matches. Use those first captured values throughout the operation. Do not reread either source to detect intervening edits, selection changes, navigation, or metadata updates, and do not abort merely because these may have occurred. For the current note-level Internal command, the adapter returns only note ID and selected text; trust the primary range supplied by CM6 rather than exporting the full body and offsets solely for duplicate validation. Capture document text and offsets when heading analysis requires them. This does not claim an atomic transaction across editor and metadata reads.
 
 When the editor has multiple selection ranges, use only its primary range. If the primary range is empty, apply the no-selection behavior even if another range contains text.
 
@@ -104,6 +106,7 @@ Heading and Note Title use the **same** inline Markdown policy:
 
 - Preserve inline code spans, emphasis, strong and strikethrough, including `*`/`_` variants.
 - Flatten pre-existing nested links to their **display content**, retaining supported inline formatting; never nest Markdown links in the outer attribution link.
+- Keep original inline code spans independent. If flattening makes two spans directly adjacent, separate them with a space to prevent their backtick delimiters from colliding; do not merge their contents (review decision, 2026-11-03).
 - Escape Markdown-sensitive characters for plain text, **always escape `|` and `#`** in label text, including user-supplied separator. Do **not** escape the contents of inline code spans.
 - Image syntax, unsafe HTML, and line breaks become readable text instead of retaining dangerous HTML or malformed inline structures.
 - Use a Markdown inline AST/structured tokens rather than global regex string replacements.
@@ -252,7 +255,7 @@ If Markdown clipboard write fails, report failure. A failed operation before any
 
 Recommended pipeline:
 
-1. `CaptureSnapshot` (CM6 state + Joplin note metadata frozen coherently).
+1. `CaptureSnapshot` (first CM6 state + one metadata read for its note ID, frozen for reuse).
 2. `ParseDocument` (block AST for heading hierarchy, quotes, inline AST for labels).
 3. `ResolveAttribution` (source heading, breadcrumb policy, H1 display filtering).
 4. `ResolveDestination` (Internal / External fallback, explicit/inferred anchor, source URL fragment handling).

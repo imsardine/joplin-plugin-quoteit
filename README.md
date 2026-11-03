@@ -6,7 +6,7 @@ Putting that quotation together by hand means gathering the passage, the note li
 
 Quote It brings those pieces together in one operation, producing a quotation with source attribution ready to paste. Use it to quote between your Joplin notes, or use the original web address of a clipped article to share a quotation outside Joplin while keeping a link to its source.
 
-> **Under development:** The features described below are not yet implemented.
+> **Under development:** This README describes the intended product experience. Implementation is in progress; some features are not yet available.
 
 ## Quoting with attribution
 
