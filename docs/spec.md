@@ -41,7 +41,9 @@ Quote It focuses on making quotations easy to copy, reuse, and share, with their
 
 ### 2.2 Selection snapshot — Confirmed
 
-Take an atomic/coherent **Selection Snapshot** containing: active note ID and title; note source URL metadata; note body/source text required for heading analysis; selection start/end offsets and selected raw Markdown; relevant editor/note identity; and settings needed for output. **On mobile capture this before opening the mode selector.**
+Take a **Selection Snapshot** containing: active note ID and title; note source URL metadata; note body/source text required for heading analysis; selection start/end offsets and selected raw Markdown; relevant editor/note identity; and settings needed for output. **On mobile capture this before opening the mode selector.**
+
+Review decision (2026-11-02): read the editor state once, then fetch metadata once for that captured note ID and verify the returned note ID matches. Use those first captured values throughout the operation. Do not reread either source to detect intervening edits, selection changes, navigation, or metadata updates, and do not abort merely because these may have occurred. For the current note-level Internal command, the adapter returns only note ID and selected text; trust the primary range supplied by CM6 rather than exporting the full body and offsets solely for duplicate validation. Capture document text and offsets when heading analysis requires them. This does not claim an atomic transaction across editor and metadata reads.
 
 When the editor has multiple selection ranges, use only its primary range. If the primary range is empty, apply the no-selection behavior even if another range contains text.
 
@@ -100,13 +102,21 @@ Return **only** `[Note Title](URL)`; do not add `>`, attribution prefix, heading
 
 ### 3.4 Attribution label Markdown — Confirmed
 
-Heading and Note Title use the **same** inline Markdown policy:
+**Note Title — review decision (2026-11-03):** titles are literal text, with a limited inline-code exception. This supersedes the earlier shared title/heading Markdown policy and title-link-flattening decisions.
+
+- Preserve only inline code enclosed by a single backtick on each side. Double/triple backtick runs, mismatched delimiters and unmatched backticks remain literal text.
+- Treat all other syntax as literal title content, including emphasis, strong, strikethrough, links, images, HTML and entity-looking text. Preserve their visible punctuation; do not flatten links/images or decode entities.
+- Escape Markdown-sensitive punctuation outside the supported code spans, including `|` and `#`. Leave code-span contents untouched. Replace title line breaks with spaces while preserving other internal whitespace.
+- No spaces are inserted to repair formatting boundaries: titles no longer produce emphasis/strong/strikethrough or flattened links.
+
+**Heading policy:** headings come from Markdown document content and retain their inline Markdown policy:
 
 - Preserve inline code spans, emphasis, strong and strikethrough, including `*`/`_` variants.
 - Flatten pre-existing nested links to their **display content**, retaining supported inline formatting; never nest Markdown links in the outer attribution link.
+- Keep original inline code spans independent. If flattening makes two spans directly adjacent, separate them with a space to prevent their backtick delimiters from colliding; do not merge their contents (review decision, 2026-11-03).
 - Escape Markdown-sensitive characters for plain text, **always escape `|` and `#`** in label text, including user-supplied separator. Do **not** escape the contents of inline code spans.
 - Image syntax, unsafe HTML, and line breaks become readable text instead of retaining dangerous HTML or malformed inline structures.
-- Use a Markdown inline AST/structured tokens rather than global regex string replacements.
+- Use a Markdown inline AST/structured tokens for headings rather than global regex string replacements. The literal-title policy does not require a Markdown AST.
 - Selected quote body is **not** subjected to attribution-label escaping.
 
 ## 4. Heading analysis, display and anchors
@@ -252,8 +262,8 @@ If Markdown clipboard write fails, report failure. A failed operation before any
 
 Recommended pipeline:
 
-1. `CaptureSnapshot` (CM6 state + Joplin note metadata frozen coherently).
-2. `ParseDocument` (block AST for heading hierarchy, quotes, inline AST for labels).
+1. `CaptureSnapshot` (first CM6 state + one metadata read for its note ID, frozen for reuse).
+2. `ParseDocument` (block AST for heading hierarchy, quotes, inline AST for heading labels; literal title handling with single-backtick code recognition).
 3. `ResolveAttribution` (source heading, breadcrumb policy, H1 display filtering).
 4. `ResolveDestination` (Internal / External fallback, explicit/inferred anchor, source URL fragment handling).
 5. `SerializeExternalUrl` (human-readable safe decoding and Markdown destination safety when enabled).
@@ -280,7 +290,8 @@ Suggested pure modules: `snapshot`, `markdown-structure`, `heading-resolver`, `l
 | No eligible display heading after H1 policy | Label contains Note Title only |
 | Breadcrumbs Full Path | Leaf-to-root headings, then Note Title, one shared separator |
 | Separator ` | ` in link label | Escaped `\|`, including custom separator |
-| Nested Markdown links in title/heading | Flatten nested link; retain allowed inline formatting |
+| Markdown syntax in note title | Preserve literal syntax; only single-backtick inline code retains formatting |
+| Nested Markdown links in heading | Flatten nested link; retain allowed inline formatting |
 | All top-level selected blocks are quotes | Flatten only if setting enabled |
 | Mixed quote + normal paragraph | Preserve entire selection's quote nesting |
 | Fenced code with `>` in literal contents | Preserved faithfully, correctly quoted |
