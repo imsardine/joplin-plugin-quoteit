@@ -16,6 +16,8 @@ Select a passage in a note and copy a Markdown blockquote with a link back to it
 - **External** links use the original web address of a clipped article, making quotations easier to share outside Joplin. If no usable web address is available, Quote It falls back to an internal note link.
 - With no text selected, copy a link to the note rather than a quotation.
 
+In the Markdown editor on desktop, use the Command Palette, an assigned keyboard shortcut, or the editor context menu to choose a Quote It command. On mobile, select your passage, tap the Quote It button in the editor toolbar, then choose Internal or External. Cancel the selector to leave the clipboard unchanged.
+
 For example, a quotation with an internal source link looks like this:
 
 ```markdown
