@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test';
 import * as assert from 'node:assert/strict';
 import { captureSnapshot } from '../src/snapshot';
-import { copyInternal } from '../src/command';
+import { runQuoteCommand } from '../src/command';
 import contentScript from '../src/contentScript';
 import { CodeMirrorControl } from 'api/types';
 
@@ -9,7 +9,7 @@ const editor = { noteId: 'a'.repeat(32), selection: 'ell' };
 
 const note = { id: editor.noteId, title: 'Note', source_url: '' };
 
-type CommandIo = Parameters<typeof copyInternal>[0];
+type CommandIo = Parameters<typeof runQuoteCommand>[0];
 
 const ioDefaults: CommandIo = {
   readEditor: async () => ({ ...editor }),
@@ -17,6 +17,83 @@ const ioDefaults: CommandIo = {
   writeClipboard: async () => {},
   notify: async () => {},
 };
+
+describe('Mobile mode selection', () => {
+  test('choosing the unavailable External mode preserves clipboard and explains how to copy', async () => {
+    let clipboard = 'previous clipboard';
+    let error: string;
+    const io = {
+      ...ioDefaults,
+      selectMode: async () => 'external' as const,
+      writeClipboard: async (text: string) => {
+        clipboard = text;
+      },
+      notify: async (message: string) => {
+        error = message;
+      },
+    };
+
+    await runQuoteCommand(io);
+
+    assert.equal(clipboard, 'previous clipboard');
+    assert.match(error, /External.*not available.*Internal/);
+  });
+
+  test('canceling mode selection preserves the clipboard without feedback', async () => {
+    let clipboard = 'previous clipboard';
+    const errors: string[] = [];
+    const io = {
+      ...ioDefaults,
+      selectMode: async () => 'cancel' as const,
+      writeClipboard: async (text: string) => {
+        clipboard = text;
+      },
+      notify: async (message: string) => {
+        errors.push(message);
+      },
+    };
+
+    await runQuoteCommand(io);
+
+    assert.equal(clipboard, 'previous clipboard');
+    assert.deepEqual(errors, []);
+  });
+
+  test('captures the source before selecting Internal and ignores subsequent edits and navigation', async () => {
+    const currentEditor = { ...editor };
+    const currentNote = { ...note };
+    let output = 'previous clipboard';
+    let selectorOpened = false;
+    const errors: string[] = [];
+    const io = {
+      ...ioDefaults,
+      readEditor: async () => currentEditor,
+      readNote: async () => currentNote,
+      selectMode: async () => {
+        selectorOpened = true;
+        assert.equal(output, 'previous clipboard');
+        currentEditor.noteId = 'another-note';
+        currentEditor.selection = 'Edited passage';
+        currentNote.title = 'Edited title';
+        return 'internal' as const;
+      },
+      writeClipboard: async (text: string) => {
+        output = text;
+      },
+      notify: async (message: string) => {
+        errors.push(message);
+      },
+    };
+
+    await runQuoteCommand(io);
+
+    const expected = ['> ell', '>', '> -- [Note](:/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'].join('\n');
+
+    assert.equal(selectorOpened, true);
+    assert.equal(output, expected);
+    assert.deepEqual(errors, []);
+  });
+});
 
 describe('Successful capture and copy', () => {
   test('copies the selection supplied by the editor adapter', async () => {
@@ -29,7 +106,7 @@ describe('Successful capture and copy', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
 
     const expected = [
       '> Captured passage',
@@ -52,7 +129,7 @@ describe('Successful capture and copy', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
 
     assert.equal(output, '[Note](:/host-note-id)');
   });
@@ -65,7 +142,7 @@ describe('Successful capture and copy', () => {
         output = text;
       },
     };
-    await copyInternal(io);
+    await runQuoteCommand(io);
     // prettier-ignore
     const expected = [
     '> ell',
@@ -108,7 +185,7 @@ describe('Capture source and validation', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
 
     // prettier-ignore
     const expected = [
@@ -126,9 +203,14 @@ describe('Capture source and validation', () => {
   test('preserves clipboard when note and editor identities differ', async () => {
     let clipboard = 'previous clipboard';
     let error: string;
+    let selectorOpened = false;
     const io = {
       ...ioDefaults,
       readNote: async () => ({ ...note, id: 'b'.repeat(32) }),
+      selectMode: async () => {
+        selectorOpened = true;
+        return 'internal' as const;
+      },
       writeClipboard: async (text) => {
         clipboard = text;
       },
@@ -137,9 +219,10 @@ describe('Capture source and validation', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
 
     assert.equal(clipboard, 'previous clipboard');
+    assert.equal(selectorOpened, false);
     assert.match(error, /retry/);
   });
 });
@@ -157,7 +240,7 @@ describe('Host and clipboard failures', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
     assert.match(error, /clipboard unavailable/);
   });
 
@@ -177,7 +260,7 @@ describe('Host and clipboard failures', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
     assert.equal(writes, 0);
     assert.match(error, /note unavailable/);
   });
@@ -198,7 +281,7 @@ describe('Host and clipboard failures', () => {
       },
     };
 
-    await copyInternal(io);
+    await runQuoteCommand(io);
 
     assert.equal(writes, 0);
     assert.match(error, /Host unavailable/);
